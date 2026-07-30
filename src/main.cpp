@@ -66,6 +66,51 @@ void onConnect() {
   net::publishPower(state::power());
 }
 
+// Serial diagnostics, keys 1-9. Works without network, MQTT or KNX, which is
+// the only way to tell a dead transmitter from a dead bus on a device that
+// never reports back. Key 1 flips the assumption like any other toggle does.
+void handleSerial() {
+  if (!Serial.available()) return;
+  char key = Serial.read();
+
+  if (key == '1') {
+    rf::send(CODE_TOGGLE);
+    bool now = !state::power();
+    state::setPower(now);
+    net::publishPower(now);
+    return;
+  }
+
+  switch (key) {
+    case '2':
+      rf::send(CODE_BRIGHT_UP);
+      break;
+    case '3':
+      rf::send(CODE_BRIGHT_DOWN);
+      break;
+    case '4':
+      rf::send(CODE_COLOR_UP);
+      break;
+    case '5':
+      rf::send(CODE_COLOR_DOWN);
+      break;
+    case '6':
+      rf::send(CODE_MODE_UP);
+      break;
+    case '7':
+      rf::send(CODE_MODE_DOWN);
+      break;
+    case '8':
+      rf::send(CODE_SPEED_UP);
+      break;
+    case '9':
+      rf::send(CODE_SPEED_DOWN);
+      break;
+    default:
+      break;
+  }
+}
+
 }  // namespace
 
 void setup() {
@@ -87,8 +132,10 @@ void setup() {
   }
 
   net::begin(config, onCommand, onConnect);
+  Serial.println("serial diagnostics: 1=on/off 2/3=bright 4/5=color 6/7=mode 8/9=speed");
 }
 
 void loop() {
   net::loop();
+  handleSerial();
 }

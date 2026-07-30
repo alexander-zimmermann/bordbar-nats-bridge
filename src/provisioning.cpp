@@ -19,15 +19,22 @@ bool portalRequested() {
   return digitalRead(PIN_BOOT) == LOW;
 }
 
+// Preferences logs an ERROR for every string key it cannot find, so reading the
+// defaults on a fresh device makes a perfectly normal first boot look like four
+// failures. Ask before reading.
+String readString(const char *key) {
+  return prefs.isKey(key) ? prefs.getString(key) : String();
+}
+
 }  // namespace
 
 bool begin(Config &out) {
   prefs.begin("bordbar-net", false);
-  out.mqttHost = prefs.getString("host", "");
+  out.mqttHost = readString("host");
   out.mqttPort = prefs.getUShort("port", 1883);
-  out.mqttUser = prefs.getString("user", "");
-  out.mqttPass = prefs.getString("pass", "");
-  out.otaPass = prefs.getString("ota", "");
+  out.mqttUser = readString("user");
+  out.mqttPass = readString("pass");
+  out.otaPass = readString("ota");
 
   char port[8];
   snprintf(port, sizeof(port), "%u", out.mqttPort);

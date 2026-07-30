@@ -129,13 +129,37 @@ access point **`bordbar-setup`** with a captive portal asking for the WiFi
 credentials plus MQTT host, port, user, password and an OTA password. Everything
 is stored in NVS. An empty OTA password leaves OTA disabled.
 
+## Serial diagnostics
+
+The serial console transmits codes directly, without network, MQTT or KNX:
+
+| Key | Code |
+|---|---|
+| `1` | on/off toggle (also flips the assumed state) |
+| `2` / `3` | brightness up / down |
+| `4` / `5` | colour up / down |
+| `6` / `7` | mode up / down |
+| `8` / `9` | speed up / down |
+
+On a device that never reports back this is the only way to tell a dead
+transmitter from a dead bus, so it stays in the production build.
+
 ## Build and flash
 
 ```sh
-pio run                       # build
-pio run -t upload             # flash over USB
-pio run -e esp32dev-ota -t upload   # flash over the network
-pio device monitor            # serial log at 115200
+pio run              # build
+pio run -t upload    # flash over USB
+pio device monitor   # serial log at 115200
+```
+
+Over the air, once the device is built into the cabinet — same binary, only a
+different upload path, so this is a command-line override rather than a second
+build environment:
+
+```sh
+PLATFORMIO_UPLOAD_PROTOCOL=espota \
+PLATFORMIO_UPLOAD_PORT=bordbar.zimmermann.eu.com \
+  pio run -t upload
 ```
 
 ## License
