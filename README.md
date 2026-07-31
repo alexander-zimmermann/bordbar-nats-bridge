@@ -159,8 +159,13 @@ build environment:
 ```sh
 PLATFORMIO_UPLOAD_PROTOCOL=espota \
 PLATFORMIO_UPLOAD_PORT=bordbar.zimmermann.eu.com \
+PLATFORMIO_UPLOAD_FLAGS=--auth=<ota-password> \
   pio run -t upload
 ```
+
+Generate that password with `openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 24`
+— alphanumeric only, so it survives the shell without quoting — enter it in the
+portal and keep it. Without it the only way back in is USB.
 
 ## License
 
