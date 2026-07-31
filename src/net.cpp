@@ -11,8 +11,18 @@ namespace {
 constexpr char TOPIC_STATE[] = "bordbar/state";
 constexpr char TOPIC_AVAILABILITY[] = "bordbar/availability";
 constexpr char TOPIC_COMMANDS[] = "bordbar/command/#";
+constexpr char TOPIC_SELFTEST[] = "bordbar/command/selftest";
 constexpr char COMMAND_PREFIX[] = "bordbar/command/";
+constexpr char ACTION_SELFTEST[] = "selftest";
 constexpr char CLIENT_ID[] = "bordbar";
+
+// A broker may refuse a subscription — NATS does when the permissions do not
+// cover the wildcard's base subject. PubSubClient never surfaces the negative
+// SUBACK, so the device would keep reporting a healthy connection while
+// dropping every command. After subscribing we therefore publish a self-test
+// and expect it back through our own subscription; silence means the
+// subscription is dead and reconnecting is the only way out.
+constexpr uint32_t SELFTEST_TIMEOUT_MS = 5000;
 
 // The last will is what makes a dead ESP32 visible on the KNX bus: NATS
 // publishes it on our behalf and the writer rule drops the availability GA.
@@ -30,11 +40,21 @@ ConnectHandler connectHandler = nullptr;
 
 uint32_t backoffMs = BACKOFF_MIN_MS;
 uint32_t nextAttemptAt = 0;
+uint32_t selftestSentAt = 0;
+bool selftestPending = false;
 
 void onMessage(char *topic, byte *payload, unsigned int length) {
   size_t prefixLen = strlen(COMMAND_PREFIX);
   if (strncmp(topic, COMMAND_PREFIX, prefixLen) != 0) return;
   const char *action = topic + prefixLen;
+
+  if (strcmp(action, ACTION_SELFTEST) == 0) {
+    if (selftestPending) {
+      selftestPending = false;
+      Serial.println("command subscription verified");
+    }
+    return;  // never reaches the dispatcher
+  }
 
   int value = 0;
   bool hasValue = false;
@@ -69,6 +89,10 @@ void connect() {
   mqtt.subscribe(TOPIC_COMMANDS);
   Serial.println("MQTT connected");
   if (connectHandler != nullptr) connectHandler();
+
+  selftestPending = true;
+  selftestSentAt = millis();
+  mqtt.publish(TOPIC_SELFTEST, "{}");
 }
 
 }  // namespace
@@ -78,8 +102,16 @@ void begin(const provisioning::Config &cfg, CommandHandler on_command, ConnectHa
   commandHandler = on_command;
   connectHandler = on_connect;
 
+  // Modem sleep parks the radio between beacons, which showed up as a 30-150 ms
+  // latency sawtooth and packet loss on an already weak link. The device is
+  // mains powered, so the extra draw does not matter.
+  WiFi.setSleep(false);
+
   mqtt.setServer(config.mqttHost.c_str(), config.mqttPort);
   mqtt.setCallback(onMessage);
+  // The 15 s default is tight once the link gets slow, and a missed keepalive
+  // costs a reconnect — during which core-NATS commands are lost for good.
+  mqtt.setKeepAlive(30);
 
   ArduinoOTA.setHostname("bordbar");
   if (config.otaPass.isEmpty()) {
@@ -95,6 +127,17 @@ void loop() {
 
   if (mqtt.connected()) {
     mqtt.loop();
+    if (selftestPending && millis() - selftestSentAt > SELFTEST_TIMEOUT_MS) {
+      selftestPending = false;
+      // Back off as if the connect had failed: if the permission is genuinely
+      // wrong, retrying every 5 s would only flap the last will and hammer the
+      // status group address.
+      backoffMs = min(backoffMs * 2, BACKOFF_MAX_MS);
+      nextAttemptAt = millis() + backoffMs;
+      Serial.printf("self-test did not return — subscription refused, retrying in %u ms\n",
+                    backoffMs);
+      mqtt.disconnect();
+    }
     return;
   }
   if (WiFi.status() != WL_CONNECTED) return;

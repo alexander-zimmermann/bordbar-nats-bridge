@@ -100,10 +100,28 @@ The MQTT gateway maps `/` to `.`, so the firmware's topics are the subjects.
 | `bordbar.command.reset` | `{}` | assume off, then restart |
 | `bordbar.state` | `{"power": bool}` | assumed state, retained |
 | `bordbar.availability` | `{"online": bool}` | retained, `false` via last will |
+| `bordbar.command.selftest` | `{}` | published by the device itself, see below |
 
 Command subjects are deliberately **not** covered by the JetStream `BORDBAR`
 stream. Were they archived, a reconnecting MQTT session could be handed stale
 commands and switch the light — or reboot the device — unprompted.
+
+## Verifying the subscription
+
+A broker can refuse a subscription — NATS does when the permissions do not cover
+the wildcard's base subject, since `bordbar/command/#` also matches
+`bordbar/command` itself. PubSubClient never surfaces the negative SUBACK, so
+the device would report a healthy connection and drop every command in silence.
+
+After subscribing, the firmware publishes `bordbar/command/selftest` and expects
+it back through its own subscription. If nothing returns within five seconds the
+subscription is dead, and it reconnects with the same backoff a failed connect
+uses — retrying faster would only flap the last will and hammer the KNX status
+address. The self-test is consumed internally and never reaches the command
+dispatcher.
+
+Log lines to look for: `command subscription verified`, or
+`self-test did not return — subscription refused`.
 
 ## Assumed state, and the reset command
 
