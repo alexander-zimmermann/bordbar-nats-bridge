@@ -129,8 +129,8 @@ captive portal asking for the WiFi credentials plus MQTT host, port, user,
 password and an OTA password. Everything is stored in NVS. An empty OTA password
 leaves OTA disabled.
 
-To change it later, **hold BOOT (GPIO 0) for three seconds while the device is
-running** — the portal reopens with the stored values prefilled and the device
+To change it later, press **`p`** on the serial console, or **hold BOOT (GPIO 0)
+for three seconds while the device is running** — the portal reopens with the stored values prefilled and the device
 restarts afterwards. Note that holding BOOT during reset does *not* work: it is a
 strapping pin, so the chip would enter the ROM download loader and never reach
 the application.
@@ -141,6 +141,7 @@ The serial console transmits codes directly, without network, MQTT or KNX:
 
 | Key | Code |
 |---|---|
+| `p` | reopen the configuration portal |
 | `1` | on/off toggle (also flips the assumed state) |
 | `2` / `3` | brightness up / down |
 | `4` / `5` | colour up / down |

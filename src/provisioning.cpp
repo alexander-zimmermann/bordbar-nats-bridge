@@ -87,12 +87,16 @@ bool begin(Config &out) {
 
 bool portalButtonHeld() {
   if (digitalRead(PIN_BOOT) == HIGH) {
+    if (pressedSince != 0) Serial.println("BOOT released early — hold the full 3s");
     pressedSince = 0;
     return false;
   }
   uint32_t now = millis();
   if (pressedSince == 0) {
     pressedSince = now;
+    // Printed on press, not only on success: without it a button that never
+    // reads LOW is indistinguishable from one that is released too early.
+    Serial.println("BOOT pressed — keep holding for 3s");
     return false;
   }
   return now - pressedSince >= HOLD_MS;
