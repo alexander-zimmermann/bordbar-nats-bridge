@@ -124,10 +124,16 @@ The same command reboots a wedged device without opening the cabinet.
 No credentials are compiled in, so the release `.bin` is safe to publish and
 passwords rotate without reflashing.
 
-On first boot — or when BOOT (GPIO 0) is held during reset — the device opens the
-access point **`bordbar-setup`** with a captive portal asking for the WiFi
-credentials plus MQTT host, port, user, password and an OTA password. Everything
-is stored in NVS. An empty OTA password leaves OTA disabled.
+On first boot the device opens the access point **`bordbar-setup`** with a
+captive portal asking for the WiFi credentials plus MQTT host, port, user,
+password and an OTA password. Everything is stored in NVS. An empty OTA password
+leaves OTA disabled.
+
+To change it later, **hold BOOT (GPIO 0) for three seconds while the device is
+running** — the portal reopens with the stored values prefilled and the device
+restarts afterwards. Note that holding BOOT during reset does *not* work: it is a
+strapping pin, so the chip would enter the ROM download loader and never reach
+the application.
 
 ## Serial diagnostics
 

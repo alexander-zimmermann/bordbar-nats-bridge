@@ -133,9 +133,11 @@ void setup() {
 
   net::begin(config, onCommand, onConnect);
   Serial.println("serial diagnostics: 1=on/off 2/3=bright 4/5=color 6/7=mode 8/9=speed");
+  Serial.println("hold BOOT for 3s to reopen the configuration portal");
 }
 
 void loop() {
   net::loop();
   handleSerial();
+  if (provisioning::portalButtonHeld()) provisioning::openPortal();
 }

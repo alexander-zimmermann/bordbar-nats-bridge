@@ -6,18 +6,12 @@
 namespace provisioning {
 namespace {
 
-// Holding BOOT (GPIO0) low during reset forces the portal open again, which is
-// the only way back in once the cabinet is closed and the old WiFi is gone.
 constexpr int PIN_BOOT = 0;
+constexpr uint32_t HOLD_MS = 3000;
 constexpr uint16_t PORTAL_TIMEOUT_S = 300;
 
 Preferences prefs;
-
-bool portalRequested() {
-  pinMode(PIN_BOOT, INPUT_PULLUP);
-  delay(10);
-  return digitalRead(PIN_BOOT) == LOW;
-}
+uint32_t pressedSince = 0;
 
 // Preferences logs an ERROR for every string key it cannot find, so reading the
 // defaults on a fresh device makes a perfectly normal first boot look like four
@@ -26,16 +20,24 @@ String readString(const char *key) {
   return prefs.isKey(key) ? prefs.getString(key) : String();
 }
 
-}  // namespace
-
-bool begin(Config &out) {
-  prefs.begin("bordbar-net", false);
+void load(Config &out) {
   out.mqttHost = readString("host");
   out.mqttPort = prefs.getUShort("port", 1883);
   out.mqttUser = readString("user");
   out.mqttPass = readString("pass");
   out.otaPass = readString("ota");
+}
 
+void store(const Config &c) {
+  prefs.putString("host", c.mqttHost);
+  prefs.putUShort("port", c.mqttPort);
+  prefs.putString("user", c.mqttUser);
+  prefs.putString("pass", c.mqttPass);
+  prefs.putString("ota", c.otaPass);
+}
+
+// Runs the portal (or a plain reconnect) and writes back whatever was entered.
+bool runPortal(Config &out, bool forced) {
   char port[8];
   snprintf(port, sizeof(port), "%u", out.mqttPort);
 
@@ -54,9 +56,6 @@ bool begin(Config &out) {
   wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
   wm.setHostname("bordbar");
 
-  bool forced = portalRequested();
-  if (forced) Serial.println("BOOT held during reset — opening configuration portal");
-
   bool connected = (forced || out.mqttHost.isEmpty()) ? wm.startConfigPortal("bordbar-setup")
                                                       : wm.autoConnect("bordbar-setup");
   if (!connected) {
@@ -70,16 +69,41 @@ bool begin(Config &out) {
   out.mqttUser = p_user.getValue();
   out.mqttPass = p_pass.getValue();
   out.otaPass = p_ota.getValue();
-
-  prefs.putString("host", out.mqttHost);
-  prefs.putUShort("port", out.mqttPort);
-  prefs.putString("user", out.mqttUser);
-  prefs.putString("pass", out.mqttPass);
-  prefs.putString("ota", out.otaPass);
+  store(out);
 
   Serial.printf("WiFi %s | MQTT %s:%u as %s\n", WiFi.localIP().toString().c_str(),
                 out.mqttHost.c_str(), out.mqttPort, out.mqttUser.c_str());
   return true;
+}
+
+}  // namespace
+
+bool begin(Config &out) {
+  prefs.begin("bordbar-net", false);
+  pinMode(PIN_BOOT, INPUT_PULLUP);
+  load(out);
+  return runPortal(out, false);
+}
+
+bool portalButtonHeld() {
+  if (digitalRead(PIN_BOOT) == HIGH) {
+    pressedSince = 0;
+    return false;
+  }
+  uint32_t now = millis();
+  if (pressedSince == 0) {
+    pressedSince = now;
+    return false;
+  }
+  return now - pressedSince >= HOLD_MS;
+}
+
+void openPortal() {
+  Serial.println("BOOT held — opening configuration portal on AP bordbar-setup");
+  Config cfg;
+  load(cfg);
+  runPortal(cfg, true);
+  ESP.restart();
 }
 
 }  // namespace provisioning
