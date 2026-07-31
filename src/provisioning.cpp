@@ -6,18 +6,12 @@
 namespace provisioning {
 namespace {
 
-// Holding BOOT (GPIO0) low during reset forces the portal open again, which is
-// the only way back in once the cabinet is closed and the old WiFi is gone.
 constexpr int PIN_BOOT = 0;
+constexpr uint32_t HOLD_MS = 3000;
 constexpr uint16_t PORTAL_TIMEOUT_S = 300;
 
 Preferences prefs;
-
-bool portalRequested() {
-  pinMode(PIN_BOOT, INPUT_PULLUP);
-  delay(10);
-  return digitalRead(PIN_BOOT) == LOW;
-}
+uint32_t pressedSince = 0;
 
 // Preferences logs an ERROR for every string key it cannot find, so reading the
 // defaults on a fresh device makes a perfectly normal first boot look like four
@@ -26,16 +20,24 @@ String readString(const char *key) {
   return prefs.isKey(key) ? prefs.getString(key) : String();
 }
 
-}  // namespace
-
-bool begin(Config &out) {
-  prefs.begin("bordbar-net", false);
+void load(Config &out) {
   out.mqttHost = readString("host");
   out.mqttPort = prefs.getUShort("port", 1883);
   out.mqttUser = readString("user");
   out.mqttPass = readString("pass");
   out.otaPass = readString("ota");
+}
 
+void store(const Config &c) {
+  prefs.putString("host", c.mqttHost);
+  prefs.putUShort("port", c.mqttPort);
+  prefs.putString("user", c.mqttUser);
+  prefs.putString("pass", c.mqttPass);
+  prefs.putString("ota", c.otaPass);
+}
+
+// Runs the portal (or a plain reconnect) and writes back whatever was entered.
+bool runPortal(Config &out, bool forced) {
   char port[8];
   snprintf(port, sizeof(port), "%u", out.mqttPort);
 
@@ -54,32 +56,72 @@ bool begin(Config &out) {
   wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
   wm.setHostname("bordbar");
 
-  bool forced = portalRequested();
-  if (forced) Serial.println("BOOT held during reset — opening configuration portal");
+  auto collect = [&]() {
+    out.mqttHost = p_host.getValue();
+    out.mqttPort = static_cast<uint16_t>(atoi(p_port.getValue()));
+    out.mqttUser = p_user.getValue();
+    out.mqttPass = p_pass.getValue();
+    out.otaPass = p_ota.getValue();
+    store(out);
+    Serial.printf("stored MQTT %s:%u as %s (OTA %s)\n", out.mqttHost.c_str(), out.mqttPort,
+                  out.mqttUser.c_str(), out.otaPass.isEmpty() ? "disabled" : "enabled");
+  };
 
-  bool connected = (forced || out.mqttHost.isEmpty()) ? wm.startConfigPortal("bordbar-setup")
-                                                      : wm.autoConnect("bordbar-setup");
+  // Persist as soon as the form is submitted. Saving only after the portal
+  // returns loses everything when the user submits on the parameter page and
+  // the portal then runs into its timeout instead of ending on a WiFi save.
+  wm.setSaveParamsCallback(collect);
+  // End the portal once credentials are entered, even if the join fails, so a
+  // typo in the WiFi password does not discard the MQTT fields as well.
+  wm.setBreakAfterConfig(true);
+
+  bool portal = forced || out.mqttHost.isEmpty();
+  bool connected = portal ? wm.startConfigPortal("bordbar-setup") : wm.autoConnect("bordbar-setup");
+  // Second chance for the case where the portal ends without firing the
+  // callback at all; a plain reconnect has nothing new to store.
+  if (portal) collect();
   if (!connected) {
-    Serial.println("portal timed out without a usable configuration");
+    Serial.println("portal ended without a WiFi connection — settings were still stored");
     return false;
   }
-
-  // WiFiManager keeps the WiFi credentials itself; the MQTT ones are ours.
-  out.mqttHost = p_host.getValue();
-  out.mqttPort = static_cast<uint16_t>(atoi(p_port.getValue()));
-  out.mqttUser = p_user.getValue();
-  out.mqttPass = p_pass.getValue();
-  out.otaPass = p_ota.getValue();
-
-  prefs.putString("host", out.mqttHost);
-  prefs.putUShort("port", out.mqttPort);
-  prefs.putString("user", out.mqttUser);
-  prefs.putString("pass", out.mqttPass);
-  prefs.putString("ota", out.otaPass);
 
   Serial.printf("WiFi %s | MQTT %s:%u as %s\n", WiFi.localIP().toString().c_str(),
                 out.mqttHost.c_str(), out.mqttPort, out.mqttUser.c_str());
   return true;
+}
+
+}  // namespace
+
+bool begin(Config &out) {
+  prefs.begin("bordbar-net", false);
+  pinMode(PIN_BOOT, INPUT_PULLUP);
+  load(out);
+  return runPortal(out, false);
+}
+
+bool portalButtonHeld() {
+  if (digitalRead(PIN_BOOT) == HIGH) {
+    if (pressedSince != 0) Serial.println("BOOT released early — hold the full 3s");
+    pressedSince = 0;
+    return false;
+  }
+  uint32_t now = millis();
+  if (pressedSince == 0) {
+    pressedSince = now;
+    // Printed on press, not only on success: without it a button that never
+    // reads LOW is indistinguishable from one that is released too early.
+    Serial.println("BOOT pressed — keep holding for 3s");
+    return false;
+  }
+  return now - pressedSince >= HOLD_MS;
+}
+
+void openPortal() {
+  Serial.println("BOOT held — opening configuration portal on AP bordbar-setup");
+  Config cfg;
+  load(cfg);
+  runPortal(cfg, true);
+  ESP.restart();
 }
 
 }  // namespace provisioning

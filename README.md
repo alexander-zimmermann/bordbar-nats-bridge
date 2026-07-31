@@ -124,10 +124,16 @@ The same command reboots a wedged device without opening the cabinet.
 No credentials are compiled in, so the release `.bin` is safe to publish and
 passwords rotate without reflashing.
 
-On first boot — or when BOOT (GPIO 0) is held during reset — the device opens the
-access point **`bordbar-setup`** with a captive portal asking for the WiFi
-credentials plus MQTT host, port, user, password and an OTA password. Everything
-is stored in NVS. An empty OTA password leaves OTA disabled.
+On first boot the device opens the access point **`bordbar-setup`** with a
+captive portal asking for the WiFi credentials plus MQTT host, port, user,
+password and an OTA password. Everything is stored in NVS. An empty OTA password
+leaves OTA disabled.
+
+To change it later, press **`p`** on the serial console, or **hold BOOT (GPIO 0)
+for three seconds while the device is running** — the portal reopens with the stored values prefilled and the device
+restarts afterwards. Note that holding BOOT during reset does *not* work: it is a
+strapping pin, so the chip would enter the ROM download loader and never reach
+the application.
 
 ## Serial diagnostics
 
@@ -135,6 +141,7 @@ The serial console transmits codes directly, without network, MQTT or KNX:
 
 | Key | Code |
 |---|---|
+| `p` | reopen the configuration portal |
 | `1` | on/off toggle (also flips the assumed state) |
 | `2` / `3` | brightness up / down |
 | `4` / `5` | colour up / down |
@@ -159,8 +166,13 @@ build environment:
 ```sh
 PLATFORMIO_UPLOAD_PROTOCOL=espota \
 PLATFORMIO_UPLOAD_PORT=bordbar.zimmermann.eu.com \
+PLATFORMIO_UPLOAD_FLAGS=--auth=<ota-password> \
   pio run -t upload
 ```
+
+Generate that password with `openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 24`
+— alphanumeric only, so it survives the shell without quoting — enter it in the
+portal and keep it. Without it the only way back in is USB.
 
 ## License
 

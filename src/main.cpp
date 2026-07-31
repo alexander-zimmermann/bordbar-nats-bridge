@@ -73,6 +73,13 @@ void handleSerial() {
   if (!Serial.available()) return;
   char key = Serial.read();
 
+  // Same portal as the BOOT long-press, but reachable while the board is on a
+  // USB cable — no dependency on the button reading correctly.
+  if (key == 'p') {
+    provisioning::openPortal();
+    return;
+  }
+
   if (key == '1') {
     rf::send(CODE_TOGGLE);
     bool now = !state::power();
@@ -133,9 +140,11 @@ void setup() {
 
   net::begin(config, onCommand, onConnect);
   Serial.println("serial diagnostics: 1=on/off 2/3=bright 4/5=color 6/7=mode 8/9=speed");
+  Serial.println("press p (or hold BOOT for 3s) to reopen the configuration portal");
 }
 
 void loop() {
   net::loop();
   handleSerial();
+  if (provisioning::portalButtonHeld()) provisioning::openPortal();
 }
