@@ -56,20 +56,34 @@ bool runPortal(Config &out, bool forced) {
   wm.setConfigPortalTimeout(PORTAL_TIMEOUT_S);
   wm.setHostname("bordbar");
 
-  bool connected = (forced || out.mqttHost.isEmpty()) ? wm.startConfigPortal("bordbar-setup")
-                                                      : wm.autoConnect("bordbar-setup");
+  auto collect = [&]() {
+    out.mqttHost = p_host.getValue();
+    out.mqttPort = static_cast<uint16_t>(atoi(p_port.getValue()));
+    out.mqttUser = p_user.getValue();
+    out.mqttPass = p_pass.getValue();
+    out.otaPass = p_ota.getValue();
+    store(out);
+    Serial.printf("stored MQTT %s:%u as %s (OTA %s)\n", out.mqttHost.c_str(), out.mqttPort,
+                  out.mqttUser.c_str(), out.otaPass.isEmpty() ? "disabled" : "enabled");
+  };
+
+  // Persist as soon as the form is submitted. Saving only after the portal
+  // returns loses everything when the user submits on the parameter page and
+  // the portal then runs into its timeout instead of ending on a WiFi save.
+  wm.setSaveParamsCallback(collect);
+  // End the portal once credentials are entered, even if the join fails, so a
+  // typo in the WiFi password does not discard the MQTT fields as well.
+  wm.setBreakAfterConfig(true);
+
+  bool portal = forced || out.mqttHost.isEmpty();
+  bool connected = portal ? wm.startConfigPortal("bordbar-setup") : wm.autoConnect("bordbar-setup");
+  // Second chance for the case where the portal ends without firing the
+  // callback at all; a plain reconnect has nothing new to store.
+  if (portal) collect();
   if (!connected) {
-    Serial.println("portal timed out without a usable configuration");
+    Serial.println("portal ended without a WiFi connection — settings were still stored");
     return false;
   }
-
-  // WiFiManager keeps the WiFi credentials itself; the MQTT ones are ours.
-  out.mqttHost = p_host.getValue();
-  out.mqttPort = static_cast<uint16_t>(atoi(p_port.getValue()));
-  out.mqttUser = p_user.getValue();
-  out.mqttPass = p_pass.getValue();
-  out.otaPass = p_ota.getValue();
-  store(out);
 
   Serial.printf("WiFi %s | MQTT %s:%u as %s\n", WiFi.localIP().toString().c_str(),
                 out.mqttHost.c_str(), out.mqttPort, out.mqttUser.c_str());
