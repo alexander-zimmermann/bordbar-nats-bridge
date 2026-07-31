@@ -8,11 +8,11 @@
 namespace net {
 namespace {
 
-constexpr char TOPIC_STATE[] = "bordbar/wohnzimmer/state";
-constexpr char TOPIC_AVAILABILITY[] = "bordbar/wohnzimmer/availability";
-constexpr char TOPIC_COMMANDS[] = "bordbar/wohnzimmer/command/#";
-constexpr char COMMAND_PREFIX[] = "bordbar/wohnzimmer/command/";
-constexpr char CLIENT_ID[] = "bordbar-wohnzimmer";
+constexpr char TOPIC_STATE[] = "bordbar/state";
+constexpr char TOPIC_AVAILABILITY[] = "bordbar/availability";
+constexpr char TOPIC_COMMANDS[] = "bordbar/command/#";
+constexpr char COMMAND_PREFIX[] = "bordbar/command/";
+constexpr char CLIENT_ID[] = "bordbar";
 
 // The last will is what makes a dead ESP32 visible on the KNX bus: NATS
 // publishes it on our behalf and the writer rule drops the availability GA.

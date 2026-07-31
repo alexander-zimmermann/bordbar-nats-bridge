@@ -1,9 +1,9 @@
 // MQTT client against the NATS MQTT gateway, plus OTA.
 //
 // Topics map 1:1 onto NATS subjects (the gateway turns '/' into '.'):
-//   bordbar/wohnzimmer/state            -> bordbar.wohnzimmer.state
-//   bordbar/wohnzimmer/availability     -> bordbar.wohnzimmer.availability
-//   bordbar/wohnzimmer/command/<action> -> bordbar.wohnzimmer.command.<action>
+//   bordbar/state            -> bordbar.state
+//   bordbar/availability     -> bordbar.availability
+//   bordbar/command/<action> -> bordbar.command.<action>
 #pragma once
 
 #include "provisioning.h"

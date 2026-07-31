@@ -9,9 +9,9 @@ the remote's transmissions and *remembers* what it sent.
 
 ## What it does
 
-- Subscribes to `bordbar.wohnzimmer.command.*` and transmits the matching remote code.
-- Publishes its assumed on/off state on `bordbar.wohnzimmer.state`.
-- Publishes reachability on `bordbar.wohnzimmer.availability`, backed by an MQTT
+- Subscribes to `bordbar.command.*` and transmits the matching remote code.
+- Publishes its assumed on/off state on `bordbar.state`.
+- Publishes reachability on `bordbar.availability`, backed by an MQTT
   last will, so a dead device is visible instead of silently swallowing commands.
 
 ## Status
@@ -92,14 +92,14 @@ The MQTT gateway maps `/` to `.`, so the firmware's topics are the subjects.
 
 | Subject | Payload | Meaning |
 |---|---|---|
-| `bordbar.wohnzimmer.command.power` | `{"value": true\|false}` | on/off; sends the toggle only when the assumption differs |
-| `bordbar.wohnzimmer.command.brightness` | `{"value": 1\|-1}` | one brightness step |
-| `bordbar.wohnzimmer.command.color` | `{"value": 1\|-1}` | one colour step |
-| `bordbar.wohnzimmer.command.mode` | `{"value": 1\|-1}` | one mode step |
-| `bordbar.wohnzimmer.command.speed` | `{"value": 1\|-1}` | one speed step |
-| `bordbar.wohnzimmer.command.reset` | `{}` | assume off, then restart |
-| `bordbar.wohnzimmer.state` | `{"power": bool}` | assumed state, retained |
-| `bordbar.wohnzimmer.availability` | `{"online": bool}` | retained, `false` via last will |
+| `bordbar.command.power` | `{"value": true\|false}` | on/off; sends the toggle only when the assumption differs |
+| `bordbar.command.brightness` | `{"value": 1\|-1}` | one brightness step |
+| `bordbar.command.color` | `{"value": 1\|-1}` | one colour step |
+| `bordbar.command.mode` | `{"value": 1\|-1}` | one mode step |
+| `bordbar.command.speed` | `{"value": 1\|-1}` | one speed step |
+| `bordbar.command.reset` | `{}` | assume off, then restart |
+| `bordbar.state` | `{"power": bool}` | assumed state, retained |
+| `bordbar.availability` | `{"online": bool}` | retained, `false` via last will |
 
 Command subjects are deliberately **not** covered by the JetStream `BORDBAR`
 stream. Were they archived, a reconnecting MQTT session could be handed stale
