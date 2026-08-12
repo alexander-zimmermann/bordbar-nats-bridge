@@ -21,17 +21,36 @@ lives in the `lares` repository (group addresses 4/2/60–68).
 
 ## Hardware
 
-ESP32 dev board plus a CC1101 module on 433 MHz with an SMA antenna, wired to VSPI:
+ESP32 dev board plus a CC1101 on 433.92 MHz with an SMA antenna, wired to VSPI.
+The radio sits on an Ebyte MBL test kit with an **E07-400M10S** module; the pin
+numbers below are the MBL carrier board's, not the module's own pads:
 
-| CC1101 | ESP32 |
-|---|---|
-| SCK | GPIO 18 |
-| MISO | GPIO 19 |
-| MOSI | GPIO 23 |
-| CSN | GPIO 5 |
-| GDO0 | GPIO 17 |
-| VCC | **3V3** (not 5V) |
-| GND | GND |
+| MBL pin | Signal | ESP32 |
+|---|---|---|
+| 3 | 3V3 (**not** 5V) | 3V3 |
+| 5 | GND | GND |
+| 12 | SCLK | GPIO 18 |
+| 10 | MISO | GPIO 19 |
+| 11 | MOSI | GPIO 23 |
+| 13 | NSS | GPIO 5 |
+| 9 | **GDO0** | GPIO 17 |
+
+Only the module power jumper (1↔2) is fitted. The MCU supply (3↔4) and the mode
+caps on M0/M1 stay off, otherwise the carrier board's STM8 drives the same lines.
+
+Pin 9 is the trap. The MBL manual calls it "PC0 / Module reset pin" because the
+carrier board serves thirteen different modules and that line is `NRST` for the
+Semtech ones. A CC1101 has no reset pin — it is reset with the `SRES` strobe over
+SPI — and on the E07 footprint the same position carries GDO0. M0 and M1 are not
+it, and TXD/RXD reach only the USB bridge.
+
+A wrong GDO0 still looks healthy from the outside: SPI answers with
+`VERSION=0x14` and `rf::send()` prints `sent 0x…`, but in asynchronous OOK mode
+only GDO0 keys the carrier, so nothing leaves the antenna. `rtl_433 -f 433.92M -A`
+while pressing `1` on the serial console is the check that proves the radio.
+
+A plain 8-pin CC1101 board works too: SCK, MISO, MOSI, CSN and GDO0 go to the
+same ESP32 pins, VCC to 3V3.
 
 ## Protocol
 
