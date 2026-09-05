@@ -15,7 +15,13 @@
 
 namespace {
 
-constexpr char FW_VERSION[] = "0.1.0";
+constexpr char FW_VERSION[] = "0.2.0";
+
+// The RF output is write-only, so a periodic republish of the retained state
+// is the only remotely observable proof that the whole delivery path (WLAN ->
+// MQTT gateway -> NATS) still works. Stream-side silence monitoring keys on it.
+constexpr uint32_t HEARTBEAT_INTERVAL_MS = 60000;
+uint32_t lastHeartbeatAt = 0;
 
 provisioning::Config config;
 
@@ -145,6 +151,10 @@ void setup() {
 
 void loop() {
   net::loop();
+  if (net::connected() && millis() - lastHeartbeatAt >= HEARTBEAT_INTERVAL_MS) {
+    lastHeartbeatAt = millis();
+    net::publishPower(state::power());
+  }
   handleSerial();
   if (provisioning::portalButtonHeld()) provisioning::openPortal();
 }

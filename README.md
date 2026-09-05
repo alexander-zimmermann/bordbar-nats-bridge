@@ -10,7 +10,9 @@ the remote's transmissions and *remembers* what it sent.
 ## What it does
 
 - Subscribes to `bordbar.command.*` and transmits the matching remote code.
-- Publishes its assumed on/off state on `bordbar.state`.
+- Publishes its assumed on/off state on `bordbar.state`, and republishes it
+  every 60 s as a heartbeat so stream-side monitoring can tell a dead delivery
+  path from a quiet day.
 - Publishes reachability on `bordbar.availability`, backed by an MQTT
   last will, so a dead device is visible instead of silently swallowing commands.
 
@@ -117,7 +119,7 @@ The MQTT gateway maps `/` to `.`, so the firmware's topics are the subjects.
 | `bordbar.command.mode` | `{"value": 1\|-1}` | one mode step |
 | `bordbar.command.speed` | `{"value": 1\|-1}` | one speed step |
 | `bordbar.command.reset` | `{}` | assume off, then restart |
-| `bordbar.state` | `{"power": bool}` | assumed state, retained |
+| `bordbar.state` | `{"power": bool}` | assumed state, retained; republished every 60 s as a heartbeat |
 | `bordbar.availability` | `{"online": bool}` | retained, `false` via last will |
 | `bordbar.command.selftest` | `{}` | published by the device itself, see below |
 
