@@ -145,6 +145,10 @@ void loop() {
   connect();
 }
 
+bool connected() {
+  return mqtt.connected();
+}
+
 void publishPower(bool on) {
   mqtt.publish(TOPIC_STATE, on ? "{\"power\":true}" : "{\"power\":false}", true);
 }

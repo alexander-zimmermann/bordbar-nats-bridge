@@ -20,6 +20,9 @@ void begin(const provisioning::Config &cfg, CommandHandler on_command, ConnectHa
 // Pumps MQTT and OTA, reconnecting with backoff. Call from loop().
 void loop();
 
+// True while the MQTT session is up; publishes are silently lost otherwise.
+bool connected();
+
 // Retained, so a restarting knx-nats-bridge can seed the status GA.
 void publishPower(bool on);
 
