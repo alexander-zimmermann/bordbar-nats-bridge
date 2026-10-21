@@ -108,11 +108,11 @@ constexpr uint16_t SYNC_LOW = 11932;
 constexpr uint8_t CODE_BITS = 24;
 constexpr uint8_t REPEATS = 7;  // the original remote repeats this often too
 
-// One rmt_data_t holds a high/low pair, so one item encodes one bit. 24 bits plus
-// the trailing sync gap, plus a zero item that tells RMT the burst ends here.
-constexpr size_t ITEMS_PER_BURST = CODE_BITS + 2;
+// One rmt_data_t holds a high/low pair, so one item encodes one bit: 24 bits plus
+// the trailing sync gap. The driver ends the burst after the last item, GDO0 low.
+constexpr size_t ITEMS_PER_BURST = CODE_BITS + 1;
 
-rmt_obj_t *rmt = nullptr;
+bool rmtReady = false;
 
 void csLow() {
   digitalWrite(PIN_CS, LOW);
@@ -197,20 +197,18 @@ bool begin() {
 
   configure();
 
-  rmt = rmtInit(PIN_GDO0, RMT_TX_MODE, RMT_MEM_64);
-  if (rmt == nullptr) {
+  // A 1 MHz tick, so the durations above are microseconds.
+  rmtReady = rmtInit(PIN_GDO0, RMT_TX_MODE, RMT_MEM_NUM_BLOCKS_1, 1000000);
+  if (!rmtReady) {
     Serial.println("RMT channel could not be claimed for GDO0");
     return false;
   }
-  // Durations are in microseconds; the peripheral divides the 80 MHz APB clock,
-  // so 1000 ns lands exactly on a divider of 80.
-  float tick = rmtSetTick(rmt, 1000.0f);
-  Serial.printf("RMT tick %.1f ns | 433.92 MHz OOK async | PT2262 | house code 57635\n", tick);
+  Serial.println("RMT tick 1000 ns | 433.92 MHz OOK async | PT2262 | house code 57635");
   return true;
 }
 
 void send(uint32_t code) {
-  if (rmt == nullptr) {
+  if (!rmtReady) {
     Serial.println("send() called before rf::begin() succeeded");
     return;
   }
@@ -225,12 +223,11 @@ void send(uint32_t code) {
     }
   }
   fillItem(items[CODE_BITS], SYNC_HIGH, SYNC_LOW);  // sync closes every packet
-  items[CODE_BITS + 1].val = 0;                     // end marker
 
   strobe(STX);  // arm the carrier, GDO0 now modulates it
   delayMicroseconds(500);
   for (uint8_t r = 0; r < REPEATS; r++) {
-    rmtWriteBlocking(rmt, items, ITEMS_PER_BURST);
+    rmtWrite(PIN_GDO0, items, ITEMS_PER_BURST, RMT_WAIT_FOR_EVER);
   }
   strobe(SIDLE);
 
