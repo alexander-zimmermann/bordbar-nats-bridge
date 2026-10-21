@@ -213,6 +213,12 @@ Generate that password with `openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head
 — alphanumeric only, so it survives the shell without quoting — enter it in the
 portal and keep it. Without it the only way back in is USB.
 
+The partition table is `min_spiffs.csv`: two 1.9 MB app slots for OTA, since the
+Arduino-ESP32 3.x firmware no longer fits the default 1.25 MB. OTA cannot rewrite
+the table, so a device still on the default table takes one USB flash first;
+until then an OTA upload fails for size and the old firmware keeps running. NVS
+sits at the same offset in both tables, so the stored settings survive.
+
 ## License
 
 GPL-2.0 — see [LICENSE](LICENSE).
